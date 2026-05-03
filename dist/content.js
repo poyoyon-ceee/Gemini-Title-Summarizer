@@ -1,8 +1,30 @@
-// Gemini Title Summarizer - content.js v1.16 (ボタン配置最適化版)
+// Gemini Title Summarizer - content.js v1.17 (究極最適化版)
 
-// --- 1. 要約を追加するロジック (配置をトップに変更) ---
+// --- 共通：条件を満たす要素が現れるまで待機する堅牢な関数 ---
+function waitForElementCondition(selector, conditionFn, timeout = 3000) {
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      const elements = document.querySelectorAll(selector);
+      for (const el of elements) {
+        if (conditionFn(el)) {
+          clearInterval(interval);
+          resolve(el);
+          return;
+        }
+      }
+      if (Date.now() - startTime > timeout) {
+        clearInterval(interval);
+        resolve(null);
+      }
+    }, 50); // 50ms間隔で高速検知
+  });
+}
+
+// --- 1. 要約を追加するロジック ---
 function injectSummarizeButton(menu) {
-  if (menu.querySelector('.summarize-added')) return;
+  if (menu.dataset.summarizeAdded) return;
+  menu.dataset.summarizeAdded = 'true';
 
   const walker = document.createTreeWalker(menu, NodeFilter.SHOW_TEXT, null, false);
   let renameTextNode = null;
@@ -23,60 +45,61 @@ function injectSummarizeButton(menu) {
   
   const walker2 = document.createTreeWalker(summarizeBtn, NodeFilter.SHOW_TEXT, null, false);
   while (node = walker2.nextNode()) {
-    if (node.textContent.trim() === '名前を変更') {
-      node.textContent = '要約を追加';
-    }
+    if (node.textContent.trim() === '名前を変更') node.textContent = '要約を追加';
   }
 
-  summarizeBtn.addEventListener('click', (e) => {
+  summarizeBtn.addEventListener('click', async (e) => {
     e.preventDefault(); e.stopPropagation();
     console.log('Gemini Title Summarizer: 「要約を追加」クリック');
     renameBtn.click();
-    setTimeout(() => {
-      const dialogs = document.querySelectorAll('.cdk-overlay-container, [role="dialog"], mat-dialog-container');
-      let inputEl = null;
-      let activeDialog = null;
-      for(const d of dialogs) {
-        inputEl = d.querySelector('input[type="text"], input:not([type]), [contenteditable="true"]');
-        if(inputEl && (inputEl.offsetWidth > 0 || inputEl.offsetHeight > 0)) {
-          activeDialog = d;
-          break;
-        }
-      }
-      if (!inputEl) return;
-      let val = (inputEl.value || inputEl.textContent || '').trim();
-      if (!val.startsWith('要約：')) {
-        const newVal = '要約：' + val;
-        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-        nativeSetter ? nativeSetter.call(inputEl, newVal) : (inputEl.value = newVal);
-        inputEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-        setTimeout(() => {
-          if (activeDialog) {
-            const buttons = activeDialog.querySelectorAll('button');
-            for (const btn of buttons) {
-              if (btn.textContent.includes('名前を変更') && !btn.classList.contains('summarize-added')) {
-                btn.click();
-                break;
-              }
-            }
-          }
-        }, 150);
-      }
-    }, 300);
+
+    // 入力欄をポーリング待機
+    const inputEl = await waitForElementCondition(
+      '[role="dialog"] input, .cdk-overlay-container input, [role="dialog"] [contenteditable="true"], .cdk-overlay-container [contenteditable="true"]',
+      (el) => el.offsetWidth > 0 || el.offsetHeight > 0,
+      3000
+    );
+
+    if (!inputEl) return console.error('Gemini Title Summarizer: 入力欄が見つかりません');
+
+    let val = (inputEl.value || inputEl.textContent || '').trim();
+    const activeDialog = inputEl.closest('[role="dialog"], .mat-mdc-dialog-container, .cdk-overlay-container');
+
+    if (!val.startsWith('要約：')) {
+      const newVal = '要約：' + val;
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      nativeSetter ? nativeSetter.call(inputEl, newVal) : (inputEl.value = newVal);
+      inputEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+      
+      // 保存ボタンをポーリング待機
+      const saveBtn = await waitForElementCondition(
+        'button',
+        (btn) => activeDialog && activeDialog.contains(btn) && btn.textContent.includes('名前を変更') && !btn.classList.contains('summarize-added') && !btn.disabled,
+        2000
+      );
+      if (saveBtn) saveBtn.click();
+
+    } else {
+      // キャンセルボタンをポーリング待機
+      const cancelBtn = await waitForElementCondition(
+        'button',
+        (btn) => activeDialog && activeDialog.contains(btn) && btn.textContent.includes('キャンセル'),
+        1000
+      );
+      if (cancelBtn) cancelBtn.click();
+    }
   });
 
-  // 配置ロジック: 「ゴミ箱へポイ」があればその直後に、なければ先頭に
   const archiveBtn = menu.querySelector('.archive-added');
-  if (archiveBtn) {
-    archiveBtn.insertAdjacentElement('afterend', summarizeBtn);
-  } else {
-    menu.prepend(summarizeBtn);
-  }
+  if (archiveBtn) archiveBtn.insertAdjacentElement('afterend', summarizeBtn);
+  else menu.prepend(summarizeBtn);
 }
 
-// --- 2. ゴミ箱（ノートブック）へ移動するロジック (配置をトップに変更) ---
+// --- 2. ゴミ箱（ノートブック）へ移動するロジック ---
 function injectArchiveButton(menu) {
-  if (menu.querySelector('.archive-added')) return;
+  if (menu.dataset.archiveAdded) return;
+  menu.dataset.archiveAdded = 'true';
+
   const notebookBtn = Array.from(menu.querySelectorAll('[role="menuitem"], button')).find(el => el.textContent.includes('ノートブックに追加'));
   if (!notebookBtn) return;
 
@@ -88,57 +111,42 @@ function injectArchiveButton(menu) {
   if (label) label.textContent = 'ゴミ箱へポイ';
   else archiveBtn.textContent = 'ゴミ箱へポイ';
 
-  archiveBtn.addEventListener('click', (e) => {
+  archiveBtn.addEventListener('click', async (e) => {
     e.preventDefault(); e.stopPropagation();
     console.log('Gemini Title Summarizer: アーカイブ開始');
     notebookBtn.click();
-    let trashItem = null;
-    let attempts = 0;
-    const findTrashInterval = setInterval(() => {
-      attempts++;
-      const overlays = document.querySelectorAll('.cdk-overlay-container, [role="dialog"], mat-dialog-container');
-      for (const overlay of overlays) {
-        const elements = overlay.querySelectorAll('*');
-        for (const el of elements) {
-          if (el.textContent.trim() === 'ゴミ箱' && el.children.length === 0 && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
-            trashItem = el.closest('mat-list-item, [role="option"], button, li') || el;
-            break;
-          }
-        }
-        if (trashItem) break;
+
+    // ゴミ箱の要素をポーリング待機
+    const trashItem = await waitForElementCondition(
+      '.cdk-overlay-container span, .cdk-overlay-container div, [role="dialog"] span, [role="dialog"] div',
+      (el) => el.textContent.trim() === 'ゴミ箱' && el.children.length === 0 && (el.offsetWidth > 0 || el.offsetHeight > 0),
+      3000
+    );
+
+    if (trashItem) {
+      console.log('Gemini Title Summarizer: ダイアログ内のゴミ箱を発見', trashItem);
+      const clickableTarget = trashItem.closest('mat-list-item, [role="option"], button, li') || trashItem;
+      clickableTarget.click(); 
+      
+      // 追加ボタンをポーリング待機
+      const addBtn = await waitForElementCondition(
+        '.cdk-overlay-container button, [role="dialog"] button',
+        (btn) => btn.textContent.includes('追加') && !btn.disabled && (btn.offsetWidth > 0 || btn.offsetHeight > 0),
+        2000
+      );
+      
+      if (addBtn) {
+        console.log('Gemini Title Summarizer: 追加ボタンをクリックして完了');
+        addBtn.click();
       }
-      if (trashItem) {
-        clearInterval(findTrashInterval);
-        trashItem.click(); 
-        let addAttempts = 0;
-        const clickAddInterval = setInterval(() => {
-          addAttempts++;
-          const overlays = document.querySelectorAll('.cdk-overlay-container, [role="dialog"], mat-dialog-container');
-          for (const overlay of overlays) {
-            const buttons = overlay.querySelectorAll('button');
-            for (const btn of buttons) {
-              if (btn.textContent.includes('追加') && !btn.disabled && (btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
-                btn.click();
-                clearInterval(clickAddInterval);
-                return;
-              }
-            }
-          }
-          if (addAttempts > 20) clearInterval(clickAddInterval);
-        }, 100);
-      } else if (attempts > 30) { 
-        clearInterval(findTrashInterval);
-      }
-    }, 100);
+    } else {
+      console.error('Gemini Title Summarizer: タイムアウト。「ゴミ箱」が見つかりません。');
+    }
   });
   
-  // 先頭に配置
   menu.prepend(archiveBtn);
-  // もし「要約を追加」が既に先頭にあったら、Archiveの後ろに移動させる
   const summarizeBtn = menu.querySelector('.summarize-added');
-  if (summarizeBtn) {
-    archiveBtn.insertAdjacentElement('afterend', summarizeBtn);
-  }
+  if (summarizeBtn) archiveBtn.insertAdjacentElement('afterend', summarizeBtn);
 }
 
 // --- 3. 監視ロジック ---
@@ -147,9 +155,10 @@ const observer = new MutationObserver(() => {
   if (isInjecting) return;
   const menus = document.querySelectorAll('[role="menu"], .mat-mdc-menu-panel');
   for (const menu of menus) {
-    if (menu && (menu.offsetWidth > 0 || menu.offsetHeight > 0) && !menu.querySelector('.summarize-added')) {
+    if (menu && (menu.offsetWidth > 0 || menu.offsetHeight > 0) && !menu.dataset.gtsProcessed) {
       isInjecting = true;
       try {
+        menu.dataset.gtsProcessed = 'true';
         if (menu.textContent.includes('名前を変更')) injectSummarizeButton(menu);
         if (menu.textContent.includes('ノートブックに追加')) injectArchiveButton(menu);
       } finally {
@@ -160,4 +169,4 @@ const observer = new MutationObserver(() => {
 });
 
 observer.observe(document.body, { childList: true, subtree: true });
-console.log('Gemini Title Summarizer: 監視開始 (v1.16 - ボタン配置最適化版)');
+console.log('Gemini Title Summarizer: 監視開始 (v1.17 - 究極最適化版)');
