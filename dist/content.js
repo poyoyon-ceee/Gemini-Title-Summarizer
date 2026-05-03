@@ -42,6 +42,7 @@ function injectSummarizeButton(menu) {
 
   const summarizeBtn = renameBtn.cloneNode(true);
   summarizeBtn.classList.add('summarize-added');
+  summarizeBtn.style.color = '#00b0ff'; // 水色に変更
   
   const walker2 = document.createTreeWalker(summarizeBtn, NodeFilter.SHOW_TEXT, null, false);
   while (node = walker2.nextNode()) {
