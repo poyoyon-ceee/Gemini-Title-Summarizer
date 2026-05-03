@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Gemini Title Summarizer",
-  "version": "1.7.0",
-  "description": "Geminiのチャットタイトルに「要約：」を自動追加する拡張機能",
+  "version": "1.15.0",
+  "description": "Geminiのチャット管理を劇的に効率化する拡張機能（要約＆アーカイブ統合安定版）",
   "icons": {
     "128": "icon.png"
   },
