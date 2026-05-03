@@ -1,16 +1,20 @@
 {
   "manifest_version": 3,
   "name": "Gemini Title Summarizer",
-  "version": "1.0",
-  "description": "Geminiのチャットタイトルに「要約：」を自動追加するメニューを拡張します。",
-  "content_scripts": [
-    {
-      "matches": ["https://gemini.google.com/*"],
-      "js": ["content.js"],
-      "run_at": "document_end"
-    }
-  ],
+  "version": "1.7.0",
+  "description": "Geminiのチャットタイトルに「要約：」を自動追加する拡張機能",
   "icons": {
     "128": "icon.png"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "content.js"
+      ]
+    }
+  ],
+  "permissions": []
 }
