@@ -46,12 +46,12 @@ function injectSummarizeButton(menu) {
   
   const walker2 = document.createTreeWalker(summarizeBtn, NodeFilter.SHOW_TEXT, null, false);
   while (node = walker2.nextNode()) {
-    if (node.textContent.trim() === '名前を変更') node.textContent = '要約を追加';
+    if (node.textContent.trim() === '名前を変更') node.textContent = '動画要約に分類';
   }
 
   summarizeBtn.addEventListener('click', async (e) => {
     e.preventDefault(); e.stopPropagation();
-    console.log('Gemini Title Summarizer: 「要約を追加」クリック');
+    console.log('Gemini Title Summarizer: 「動画要約に分類」クリック');
     renameBtn.click();
 
     // 入力欄をポーリング待機
