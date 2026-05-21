@@ -1,4 +1,4 @@
-// Gemini Title Summarizer - content.js v1.17 (究極最適化版)
+// Gemini Title Summarizer - content.js v1.18 (メインペイン対応)
 
 // --- 共通：条件を満たす要素が現れるまで待機する堅牢な関数 ---
 function waitForElementCondition(selector, conditionFn, timeout = 3000) {
@@ -97,11 +97,29 @@ function injectSummarizeButton(menu) {
 }
 
 // --- 2. ゴミ箱（ノートブック）へ移動するロジック ---
+const NOTEBOOK_MENU_LABELS = ['ノートブックに追加', 'ノートブックに移動'];
+
+function menuHasNotebookAction(menu) {
+  return NOTEBOOK_MENU_LABELS.some((label) => menu.textContent.includes(label));
+}
+
+function findNotebookMenuItem(menu) {
+  return Array.from(menu.querySelectorAll('[role="menuitem"], button')).find((el) =>
+    NOTEBOOK_MENU_LABELS.some((label) => el.textContent.includes(label))
+  );
+}
+
+function isNotebookDialogConfirmButton(btn) {
+  const text = btn.textContent.trim();
+  const isMoveConfirm = text.includes('移動') && !text.includes('ノートブック');
+  return (text.includes('追加') || isMoveConfirm) && !btn.disabled && (btn.offsetWidth > 0 || btn.offsetHeight > 0);
+}
+
 function injectArchiveButton(menu) {
   if (menu.dataset.archiveAdded) return;
   menu.dataset.archiveAdded = 'true';
 
-  const notebookBtn = Array.from(menu.querySelectorAll('[role="menuitem"], button')).find(el => el.textContent.includes('ノートブックに追加'));
+  const notebookBtn = findNotebookMenuItem(menu);
   if (!notebookBtn) return;
 
   const archiveBtn = notebookBtn.cloneNode(true);
@@ -129,16 +147,16 @@ function injectArchiveButton(menu) {
       const clickableTarget = trashItem.closest('mat-list-item, [role="option"], button, li') || trashItem;
       clickableTarget.click(); 
       
-      // 追加ボタンをポーリング待機
-      const addBtn = await waitForElementCondition(
+      // 追加 / 移動 確定ボタンをポーリング待機
+      const confirmBtn = await waitForElementCondition(
         '.cdk-overlay-container button, [role="dialog"] button',
-        (btn) => btn.textContent.includes('追加') && !btn.disabled && (btn.offsetWidth > 0 || btn.offsetHeight > 0),
+        isNotebookDialogConfirmButton,
         2000
       );
       
-      if (addBtn) {
-        console.log('Gemini Title Summarizer: 追加ボタンをクリックして完了');
-        addBtn.click();
+      if (confirmBtn) {
+        console.log('Gemini Title Summarizer: 確定ボタンをクリックして完了', confirmBtn.textContent.trim());
+        confirmBtn.click();
       }
     } else {
       console.error('Gemini Title Summarizer: タイムアウト。「ゴミ箱」が見つかりません。');
@@ -161,7 +179,7 @@ const observer = new MutationObserver(() => {
       try {
         menu.dataset.gtsProcessed = 'true';
         if (menu.textContent.includes('名前を変更')) injectSummarizeButton(menu);
-        if (menu.textContent.includes('ノートブックに追加')) injectArchiveButton(menu);
+        if (menuHasNotebookAction(menu)) injectArchiveButton(menu);
       } finally {
         isInjecting = false;
       }
@@ -170,4 +188,4 @@ const observer = new MutationObserver(() => {
 });
 
 observer.observe(document.body, { childList: true, subtree: true });
-console.log('Gemini Title Summarizer: 監視開始 (v1.17 - 究極最適化版)');
+console.log('Gemini Title Summarizer: 監視開始 (v1.18 - メインペイン対応)');

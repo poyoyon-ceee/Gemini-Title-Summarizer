@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Gemini Title Summarizer",
-  "version": "1.17.0",
-  "description": "Geminiのチャット管理を劇的に効率化する拡張機能（究極最適化・async/await版）",
+  "version": "1.18.0",
+  "description": "Geminiのチャット管理を劇的に効率化する拡張機能（左ペイン・メインペイン対応）",
   "icons": {
     "128": "icon.png"
   },
